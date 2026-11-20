@@ -313,7 +313,7 @@ function drawDetail(){
 }
 
 /* ---------- Google Drive ผ่าน Google Apps Script ---------- */
-const CONFIG={API_URL:"PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE"};
+const CONFIG={API_URL:"https://script.google.com/macros/s/AKfycbw-nrMBwhnz3llPwyX-8AsoxDT8sOdGoehjvHKBdahBUSS4-r55Rn97N2Wc5Na-o2nAaQ/exec"};
 const API=/^https:\/\/script\.google\.com\//.test(CONFIG.API_URL)?CONFIG.API_URL:"";
 let ukey="";try{ukey=localStorage.getItem("cmuUploadKey")||""}catch(e){}
 const thumb=(id,w)=>`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w}`;
