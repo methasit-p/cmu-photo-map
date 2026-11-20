@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แผนที่ภาพ มช.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@600;700&family=Anuphan:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: friendly campus guide, a little proud, practical for photo collecting
+   IDEA: the fold-out illustrated campus map you get at the front gate, with stamps for places you've photographed
+   PICTURE: a drawn map of the campus (Doi Suthep, Ang Kaew, roads) with pins that fill in once photos are saved
+   COLOUR and TYPE: CMU purple dominant, Butea (ทองกวาว) orange accent, map-paper green ground; Prompt titles, Anuphan body
+   LAYOUT: header strip with progress, map large on the left, place panel on the right; stacks map → panel under 860px */
+:root{color-scheme:light dark;
+--bg:light-dark(#f7f4fb,#140f1a);--ink:light-dark(#1d1426,#efe9f5);--mute:light-dark(#62566e,#ab9fb8);
+--pu:light-dark(#5c2483,#b98ae0);--pu2:light-dark(#efe5f7,#2a1d37);--or:#f08a24;--card:light-dark(#fff,#1d1626);--line:light-dark(#e2d8ec,#33283f);
+--ground:light-dark(#eaf0dc,#16201a);--grass:light-dark(#d4e4bd,#1d2c21);--mtn:light-dark(#b9cf9d,#22362a);--mtn2:light-dark(#a3bf86,#2b4434);
+--water:light-dark(#9fd0e6,#1f4a5e);--road:light-dark(#fffdf6,#3a3a33);--roade:light-dark(#d8ceb7,#2a2a24);--bldg:light-dark(#e6dccb,#2c2a2e);--teal:#14958a}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Anuphan,"Noto Sans Thai",system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:Prompt,Anuphan,sans-serif;line-height:1.1;margin:0;text-wrap:balance}
+button,input{font:inherit}
+button{cursor:pointer;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 14px}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--or);outline-offset:2px}
+button.pri{background:var(--pu);border-color:var(--pu);color:light-dark(#fff,#140f1a);font-weight:600}
+button:disabled{opacity:.5;cursor:not-allowed}
+a{color:var(--pu)}
+header{background:var(--pu);color:light-dark(#fff,#140f1a);padding:18px max(4vw,16px);display:flex;flex-wrap:wrap;gap:12px 28px;align-items:center;justify-content:space-between}
+header h1{font-size:clamp(24px,3.4vw,36px)}
+header p{margin:4px 0 0;opacity:.85;font-size:15px}
+.prog{min-width:220px;flex:0 1 320px}
+.prog b{font-family:Prompt;font-size:22px}
+.bar{height:10px;border-radius:6px;background:rgba(255,255,255,.25);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--or);width:0;transition:width .5s}
+.status{font-size:14px;margin-top:6px;opacity:.9}
+main{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:0;min-height:calc(100vh - 110px)}
+.mapwrap{position:relative;background:var(--ground);border-right:1px solid var(--line);display:flex;flex-direction:column}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;padding:12px max(2vw,12px);background:var(--card);border-bottom:1px solid var(--line)}
+.tabs button[aria-pressed=true]{background:var(--pu2);border-color:var(--pu);color:var(--pu);font-weight:600}
+.fig{position:relative;flex:1;min-height:520px;touch-action:none}
+.fig>svg{position:absolute;inset:0;width:100%;height:100%;cursor:grab;user-select:none}
+.fig.adding>svg{cursor:crosshair}
+.zoom{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:44px;padding:0;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.legend{position:absolute;left:12px;top:72px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:13px;display:flex;gap:14px;flex-wrap:wrap;max-width:calc(100% - 24px)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+.addhint{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:var(--or);color:#1d1426;padding:8px 14px;border-radius:999px;font-weight:600;font-size:14px;display:none}
+.adding .addhint{display:block}
+.ground{fill:var(--ground)}.grass{fill:var(--grass)}.mtn{fill:var(--mtn)}.mtn2{fill:var(--mtn2)}.water{fill:var(--water)}
+.road{fill:none;stroke:var(--road);stroke-linecap:round;stroke-linejoin:round}.roade{fill:none;stroke:var(--roade);stroke-linecap:round;stroke-linejoin:round}
+.bldg{fill:var(--bldg)}
+.lbl{font:600 15px Anuphan,sans-serif;fill:var(--ink);paint-order:stroke;stroke:var(--ground);stroke-width:4px;stroke-linejoin:round}
+.area{font:600 18px Prompt,sans-serif;fill:var(--mute);opacity:.8}
+.rlbl{font:500 13px Anuphan,sans-serif;fill:var(--mute)}
+.pin{cursor:pointer}
+.pin .ring{stroke-width:4;fill:var(--card)}
+.pin.has .ring{fill:currentColor}
+.pin .cnt{font:700 12px Anuphan,sans-serif;fill:#fff;text-anchor:middle}
+.pin.sel .halo{opacity:1}
+.pin .halo{opacity:0;fill:none;stroke:var(--or);stroke-width:4;transition:opacity .2s}
+.pin:hover .halo,.pin:focus .halo{opacity:.7}
+.pin:focus{outline:none}
+aside{background:var(--card);display:flex;flex-direction:column;max-height:calc(100vh - 110px);position:sticky;top:0}
+.ptop{padding:16px;border-bottom:1px solid var(--line);display:grid;gap:10px}
+.ptop input{width:100%;min-height:44px;border:1px solid var(--line);border-radius:12px;padding:0 14px;background:var(--bg);color:var(--ink);font-size:16px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{min-height:36px;border-radius:999px;font-size:14px}
+.chips button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.pbody{overflow:auto;padding:8px 16px 24px;flex:1}
+.grp{font:600 13px Anuphan;color:var(--mute);margin:16px 0 4px}
+.item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;padding:10px 2px}
+.item:hover{background:var(--pu2)}
+.item .nm{flex:1}
+.item small{display:block;color:var(--mute);font-size:13px}
+.badge{font:600 13px Anuphan;color:var(--mute);white-space:nowrap}
+.badge.ok{color:var(--teal)}
+.back{border:0;padding:0 4px;background:none;color:var(--pu);font-weight:600}
+.det h2{font-size:28px;margin:6px 0 4px}
+.det .meta{color:var(--mute);font-size:14px;margin-bottom:12px}
+.drop{border:2px dashed var(--line);border-radius:16px;padding:18px;text-align:center;margin:12px 0;transition:border-color .2s,background .2s}
+.drop.over{border-color:var(--or);background:var(--pu2)}
+.drop p{margin:6px 0 10px;font-size:14px;color:var(--mute)}
+.gal{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.gal button{padding:0;border:0;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--pu2);min-height:0;position:relative}
+.gal img{width:100%;height:100%;object-fit:cover;display:block}
+.gal .ph{display:grid;place-items:center;height:100%;font-size:12px;color:var(--mute);padding:4px}
+.msg{font-size:14px;border-radius:10px;padding:10px 12px;margin:10px 0;background:var(--pu2)}
+.msg.err{background:light-dark(#fde8e4,#3a1d18);color:light-dark(#8a2414,#ffb4a6)}
+.note{font-size:13px;color:var(--mute);margin-top:14px}
+.empty{color:var(--mute);font-size:14px;padding:20px 0;text-align:center}
+.lb,.dlg{position:fixed;inset:0;background:rgba(10,6,14,.82);display:none;align-items:center;justify-content:center;z-index:10;padding:16px}
+.lb.on,.dlg.on{display:flex}
+.lb figure{margin:0;max-width:min(1100px,100%);display:grid;gap:10px;justify-items:center}
+.lb img{max-width:100%;max-height:78vh;border-radius:10px}
+.lb figcaption{color:#fff;font-size:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center}
+.lb a{color:#ffc68a}
+.dlg form{background:var(--card);border-radius:16px;padding:20px;width:min(420px,100%);display:grid;gap:12px}
+.dlg input{min-height:44px;border:1px solid var(--line);border-radius:12px;padding:0 14px;background:var(--bg);color:var(--ink);font-size:16px}
+.dlg .row{display:flex;gap:8px;justify-content:flex-end}
+@media(max-width:860px){main{grid-template-columns:minmax(0,1fr)}aside{max-height:none;position:static}.mapwrap{border-right:0}.fig{min-height:62vh}}
+@media(max-width:600px){.gal{grid-template-columns:repeat(2,minmax(0,1fr))}header{padding:14px 16px}.fig{min-height:0;aspect-ratio:1000/700}.tabs{flex-wrap:nowrap;overflow-x:auto}.tabs button{flex:none}.legend{position:static;border-radius:0;border-width:1px 0 0;max-width:none}.zoom{right:8px;top:8px}.zoom button{width:40px;min-height:40px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>แผนที่เก็บภาพ มหาวิทยาลัยเชียงใหม่</h1>
+    <p>แตะหมุดเพื่อดูและอัปโหลดภาพ — ภาพทุกใบเก็บใน Google Drive แยกโฟลเดอร์ตามสถานที่</p>
+  </div>
+  <div class="prog">
+    <div><b id="pDone">0</b> / <span id="pAll">0</span> สถานที่มีภาพแล้ว · <span id="pPics">0</span> ภาพ</div>
+    <div class="bar"><i id="pBar"></i></div>
+    <div class="status" id="dStatus">กำลังเชื่อมต่อ Google Drive…</div>
+  </div>
+</header>
+<main>
+  <section class="mapwrap">
+    <div class="tabs" id="tabs"></div>
+    <div class="fig" id="fig">
+      <svg id="map" viewBox="0 0 1000 700" role="img" aria-label="แผนที่มหาวิทยาลัยเชียงใหม่"></svg>
+      <div class="addhint">แตะบนแผนที่ตรงจุดที่ต้องการเพิ่ม</div>
+      <div class="zoom">
+        <button id="zin" aria-label="ซูมเข้า">+</button>
+        <button id="zout" aria-label="ซูมออก">−</button>
+        <button id="zreset" aria-label="รีเซ็ตมุมมอง">⟲</button>
+      </div>
+
+    </div>
+        <div class="legend">
+        <span><i class="dot" style="background:var(--pu)"></i>คณะ / วิทยาลัย</span>
+        <span><i class="dot" style="background:var(--or)"></i>แลนด์มาร์ค</span>
+        <span><i class="dot" style="background:var(--teal)"></i>จุดที่เพิ่มเอง</span>
+        <span>หมุดทึบ = มีภาพแล้ว</span>
+      </div>
+  </section>
+  <aside>
+    <div class="ptop" id="ptop">
+      <input id="q" type="search" placeholder="ค้นหาคณะหรือสถานที่" aria-label="ค้นหา">
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="pbody" id="pbody"></div>
+  </aside>
+</main>
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="ดูภาพ">
+  <figure><img id="lbImg" alt=""><figcaption><span id="lbCap"></span><a id="lbLink" href="#" target="_blank" rel="noopener">เปิดใน Google Drive</a><button id="lbClose">ปิด</button></figcaption></figure>
+</div>
+<div class="dlg" id="kdlg" role="dialog" aria-modal="true" aria-label="รหัสอัปโหลด">
+  <form id="kForm">
+    <h3>ใส่รหัสอัปโหลด</h3>
+    <label for="kName" style="font-size:14px;color:var(--mute)">รหัสเดียวกับ UPLOAD_KEY ที่ตั้งไว้ใน Apps Script (ป้องกันคนอื่นอัปโหลดเข้า Drive ของคุณ)</label>
+    <input id="kName" type="password" required autocomplete="off">
+    <label style="font-size:14px;display:flex;gap:8px;align-items:center"><input type="checkbox" id="kSave" checked style="width:20px;height:20px;min-height:0"> จำรหัสไว้ในเบราว์เซอร์นี้</label>
+    <div class="row"><button type="button" id="kCancel">ยกเลิก</button><button class="pri" type="submit">ตกลง</button></div>
+  </form>
+</div>
+<div class="dlg" id="dlg" role="dialog" aria-modal="true" aria-label="เพิ่มสถานที่">
+  <form id="dlgForm">
+    <h3>เพิ่มสถานที่ใหม่</h3>
+    <label for="dlgName" style="font-size:14px;color:var(--mute)">ชื่อสถานที่ (จะสร้างเป็นโฟลเดอร์ใน Drive)</label>
+    <input id="dlgName" required maxlength="60" placeholder="เช่น ต้นทองกวาวหน้าหอสมุด">
+    <div class="row"><button type="button" id="dlgCancel">ยกเลิก</button><button class="pri" type="submit">เพิ่ม</button></div>
+  </form>
+</div>
+<script>
+{
+const SRV="Google Drive", ROOT="CMU Photo Map - แผนที่ภาพ มช.", FOLDER="application/vnd.google-apps.folder";
+const CAMPUS=[
+ {id:"main",name:"วิทยาเขตหลัก (ถ.ห้วยแก้ว)"},
+ {id:"suandok",name:"เขตสวนดอก (วิทยาศาสตร์สุขภาพ)"},
+ {id:"maehia",name:"เขตแม่เหียะ"}];
+// x,y are positions on a schematic drawing (approximate)
+const BASE=[
+ ["gate","ป้ายหน้ามหาวิทยาลัยเชียงใหม่ (ประตูหน้า มช.)","ป้ายหน้า มช.","lm","main",860,78],
+ ["angkaew","อ่างแก้ว","อ่างแก้ว","lm","main",250,250],
+ ["auditorium","หอประชุมมหาวิทยาลัย","หอประชุม","lm","main",405,228],
+ ["saladham","ศาลาธรรม","ศาลาธรรม","lm","main",318,335],
+ ["library","หอสมุดกลาง","หอสมุด","lm","main",470,332],
+ ["backgate","ป้ายหลังมอ (ประตูวิศวะ)","ป้ายหลังมอ","lm","main",520,640],
+ ["tadchomphu","อ่างตาดชมพู (ตรงข้ามคณะนิติศาสตร์)","อ่างตาดชมพู","lm","main",498,392],
+ ["waterfall","น้ำตกหลังคณะการสื่อสารมวลชน","น้ำตก","lm","main",618,512],
+ ["khwaiyim","ลานควายยิ้ม (ริมอ่างแก้ว)","ลานควายยิ้ม","lm","main",318,190],
+ ["spirit","ศาลพระภูมิ มช. (สามแยกทางเข้าอ่างแก้ว)","ศาลพระภูมิ","lm","main",805,205],
+ ["fagate","ประตูคณะวิจิตรศิลป์ (ฝั่ง ถ.สุเทพ)","ประตูวิจิตรฯ","lm","main",300,640],
+ ["kadkongkong","กาดโก้งโค้ง คณะเกษตรศาสตร์","กาดโก้งโค้ง","lm","main",905,485],
+ ["hum","คณะมนุษยศาสตร์","มนุษย์","fac","main",360,425],
+ ["soc","คณะสังคมศาสตร์","สังคม","fac","main",462,455],
+ ["edu","คณะศึกษาศาสตร์","ศึกษา","fac","main",700,142],
+ ["fa","คณะวิจิตรศิลป์","วิจิตรศิลป์","fac","main",310,525],
+ ["sci","คณะวิทยาศาสตร์","วิทย์","fac","main",650,290],
+ ["law","คณะนิติศาสตร์","นิติ","fac","main",598,362],
+ ["mc","คณะการสื่อสารมวลชน","มวลชน","fac","main",565,470],
+ ["econ","คณะเศรษฐศาสตร์","เศรษฐ์","fac","main",655,432],
+ ["ba","คณะบริหารธุรกิจ","บริหาร","fac","main",755,452],
+ ["pol","คณะรัฐศาสตร์และรัฐประศาสนศาสตร์","รัฐศาสตร์","fac","main",780,340],
+ ["arch","คณะสถาปัตยกรรมศาสตร์","สถาปัตย์","fac","main",432,565],
+ ["eng","คณะวิศวกรรมศาสตร์","วิศวะ","fac","main",560,568],
+ ["camt","วิทยาลัยศิลปะ สื่อ และเทคโนโลยี","CAMT","fac","main",690,565],
+ ["agr","คณะเกษตรศาสตร์","เกษตร","fac","main",850,540],
+ ["hosp","โรงพยาบาลมหาราชนครเชียงใหม่","รพ.มหาราช","lm","suandok",560,300],
+ ["med","คณะแพทยศาสตร์","แพทย์","fac","suandok",470,390],
+ ["nurse","คณะพยาบาลศาสตร์","พยาบาล","fac","suandok",370,500],
+ ["ams","คณะเทคนิคการแพทย์","เทคนิคการแพทย์","fac","suandok",640,490],
+ ["ph","คณะสาธารณสุขศาสตร์","สาธารณสุข","fac","suandok",760,400],
+ ["dent","คณะทันตแพทยศาสตร์","ทันตะ","fac","suandok",200,300],
+ ["pharm","คณะเภสัชศาสตร์","เภสัช","fac","suandok",300,330],
+ ["vet","คณะสัตวแพทยศาสตร์","สัตวแพทย์","fac","maehia",400,330],
+ ["agro","คณะอุตสาหกรรมเกษตร","อุตสาหกรรมเกษตร","fac","maehia",640,410]];
+let places=BASE.map(([key,name,short,type,campus,x,y])=>({key,name,short,type,campus,x,y}));
+const NOB=new Set(["angkaew","tadchomphu","waterfall","khwaiyim","spirit","fagate","kadkongkong","gate","backgate"]);
+const COL={fac:"var(--pu)",lm:"var(--or)",cus:"var(--teal)"};
+const TYPE={fac:"คณะ / วิทยาลัย",lm:"แลนด์มาร์ค",cus:"จุดที่เพิ่มเอง"};
+const SCENE={
+main:`<rect class="ground" x="-500" y="-500" width="2000" height="1700"/>
+<path class="mtn" d="M-500 -500H200C165 90 220 210 175 310C135 420 205 530 160 1200H-500Z"/>
+<path class="mtn2" d="M-500 -500H120C95 120 150 260 100 380C70 470 120 600 90 1200H-500Z"/>
+<text class="area" transform="translate(70 380) rotate(-90)" text-anchor="middle">ดอยสุเทพ</text>
+<ellipse class="grass" cx="300" cy="300" rx="190" ry="150"/><ellipse class="grass" cx="860" cy="560" rx="130" ry="90"/><ellipse class="grass" cx="700" cy="200" rx="120" ry="60"/>
+<path class="water" d="M185 205C200 150 300 145 325 192C350 240 322 300 268 312C210 322 168 262 185 205Z"/><ellipse class="water" cx="500" cy="390" rx="40" ry="24"/><path class="water" d="M612 486c8 10 2 22 10 34s-2 20 6 30" style="fill:none;stroke:var(--water);stroke-width:6;stroke-linecap:round"/>
+<g id="roads">
+<path d="M150 58L1100 20"/><path d="M945 -100L965 900"/><path d="M150 662L1100 640"/>
+<path d="M860 62L805 205L560 255L420 290L360 380"/><path d="M805 205L820 610"/><path d="M420 290L455 605L840 610"/><path d="M560 255L600 610"/><path d="M520 655L520 607"/><path d="M360 380L300 470L380 600L455 605"/><path d="M805 330L940 330"/></g>
+<text class="rlbl" x="600" y="22" text-anchor="middle">ถ.ห้วยแก้ว</text><text class="rlbl" transform="translate(985 300) rotate(90)">ถ.คลองชลประทาน</text><text class="rlbl" x="990" y="680" text-anchor="end">ถ.สุเทพ</text>`,
+suandok:`<rect class="ground" x="-500" y="-500" width="2000" height="1700"/>
+<ellipse class="grass" cx="500" cy="430" rx="360" ry="200"/>
+<rect class="bldg" x="500" y="225" width="140" height="80" rx="6"/><rect class="bldg" x="430" y="320" width="110" height="60" rx="6"/>
+<g id="roads"><path d="M-100 220L1100 240"/><path d="M420 230L420 640"/><path d="M420 440L860 440"/><path d="M700 236L700 640"/><path d="M260 228L260 420"/></g>
+<text class="rlbl" x="20" y="208">← ไปวิทยาเขตหลัก</text><text class="rlbl" x="980" y="262" text-anchor="end">ถ.สุเทพ</text>
+<text class="area" x="500" y="660" text-anchor="middle">เขตสวนดอก</text>`,
+maehia:`<rect class="ground" x="-500" y="-500" width="2000" height="1700"/>
+<path class="mtn" d="M-500 -500H120C90 150 160 400 90 1200H-500Z"/>
+<g class="grass"><rect x="220" y="430" width="140" height="90" rx="8"/><rect x="380" y="430" width="140" height="90" rx="8"/><rect x="540" y="470" width="160" height="110" rx="8"/><rect x="740" y="250" width="160" height="120" rx="8"/></g>
+<g id="roads"><path d="M100 160L1100 180"/><path d="M500 170L500 640"/><path d="M500 360L860 380"/></g>
+<text class="rlbl" x="980" y="200" text-anchor="end">ถ.คลองชลประทาน</text><text class="area" x="500" y="660" text-anchor="middle">เขตแม่เหียะ</text>`};
+const $=s=>document.querySelector(s), svg=$("#map"), fig=$("#fig");
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let campus="main", filter="all", sel=null, vb={x:0,y:0,w:1000,h:700}, adding=false, addPt=null;
+let rootId=null, rootUrl="", folders={}, photos={}, busy=false, driveErr="";
+
+/* ---------- map ---------- */
+function drawMap(){
+  let s=SCENE[campus];
+  s=s.replace('<g id="roads">','<g class="roade" stroke-width="22">'+(SCENE[campus].match(/<g id="roads">([\s\S]*?)<\/g>/)||[,""])[1]+'</g><g class="road" stroke-width="15">');
+  const ps=places.filter(p=>p.campus===campus);
+  s+=ps.filter(p=>p.type!=="cus"&&!NOB.has(p.key)).map(p=>`<rect class="bldg" x="${p.x-26}" y="${p.y-20}" width="52" height="34" rx="5"/>`).join("");
+  s+=ps.map(p=>{const n=(photos[p.key]||[]).length;return `<g class="pin${n?" has":""}${sel===p.key?" sel":""}" data-k="${p.key}" tabindex="0" role="button" aria-label="${esc(p.name)} ${n} ภาพ" style="color:${COL[p.type]}" transform="translate(${p.x} ${p.y})">
+<circle class="halo" r="22"/><circle class="ring" r="14" stroke="currentColor"/>${n?`<text class="cnt" y="4">${n>99?"99+":n}</text>`:""}
+<text class="lbl" y="34" text-anchor="middle">${esc(p.short)}</text></g>`}).join("");
+  svg.innerHTML=s; setVB();
+}
+function setVB(){svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`)}
+function zoom(f,cx=vb.x+vb.w/2,cy=vb.y+vb.h/2){const w=Math.min(1400,Math.max(250,vb.w*f)),k=w/vb.w;vb={x:cx-(cx-vb.x)*k,y:cy-(cy-vb.y)*k,w,h:vb.h*k};setVB()}
+const toMap=e=>{const r=svg.getBoundingClientRect(),s=Math.max(vb.w/r.width,vb.h/r.height),ox=(r.width*s-vb.w)/2,oy=(r.height*s-vb.h)/2;return{x:vb.x-ox+(e.clientX-r.left)*s,y:vb.y-oy+(e.clientY-r.top)*s,s}};
+$("#zin").onclick=()=>zoom(.75);$("#zout").onclick=()=>zoom(1.33);$("#zreset").onclick=()=>{vb={x:0,y:0,w:1000,h:700};setVB()};
+svg.addEventListener("wheel",e=>{e.preventDefault();const p=toMap(e);zoom(e.deltaY>0?1.12:.89,p.x,p.y)},{passive:false});
+let drag=null;
+svg.addEventListener("pointerdown",e=>{if(e.target.closest(".pin"))return;drag={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y,moved:false};svg.setPointerCapture(e.pointerId)});
+svg.addEventListener("pointermove",e=>{if(!drag)return;const s=toMap(e).s,dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;vb.x=drag.vx-dx*s;vb.y=drag.vy-dy*s;setVB()});
+svg.addEventListener("pointerup",e=>{const d=drag;drag=null;if(d&&!d.moved&&adding){const p=toMap(e);addPt={x:Math.round(p.x),y:Math.round(p.y)};$("#dlg").classList.add("on");$("#dlgName").value="";$("#dlgName").focus()}});
+svg.addEventListener("click",e=>{const g=e.target.closest(".pin");if(g)select(g.dataset.k)});
+svg.addEventListener("keydown",e=>{const g=e.target.closest(".pin");if(g&&(e.key==="Enter"||e.key===" ")){e.preventDefault();select(g.dataset.k)}});
+
+function drawTabs(){$("#tabs").innerHTML=CAMPUS.map(c=>`<button data-c="${c.id}" aria-pressed="${c.id===campus}">${c.name}</button>`).join("")+`<button id="addBtn" ${rootId?"":"disabled"} title="เพิ่มจุดถ่ายภาพของคุณเอง">${adding?"ยกเลิกการเพิ่ม":"+ เพิ่มจุดใหม่"}</button>`}
+$("#tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;if(b.id==="addBtn"){adding=!adding;fig.classList.toggle("adding",adding);drawTabs();return}campus=b.dataset.c;vb={x:0,y:0,w:1000,h:700};drawTabs();drawMap()});
+
+/* ---------- panel ---------- */
+const CH=[["all","ทั้งหมด"],["fac","คณะ"],["lm","แลนด์มาร์ค"],["cus","ที่เพิ่มเอง"],["todo","ยังไม่มีภาพ"]];
+function drawChips(){$("#chips").innerHTML=CH.map(([k,t])=>`<button data-f="${k}" aria-pressed="${k===filter}">${t}</button>`).join("")}
+$("#chips").addEventListener("click",e=>{const b=e.target.closest("button");if(b){filter=b.dataset.f;drawChips();drawPanel()}});
+$("#q").addEventListener("input",()=>{sel=null;drawPanel();drawMap()});
+function drawPanel(){
+  $("#ptop").style.display=sel?"none":"";
+  if(sel)return drawDetail();
+  const q=$("#q").value.trim().toLowerCase();
+  const list=places.filter(p=>(filter==="all"||(filter==="todo"?!(photos[p.key]||[]).length:p.type===filter))&&(!q||p.name.toLowerCase().includes(q)||p.short.toLowerCase().includes(q)));
+  let h=driveErr?`<div class="msg err">${driveErr}</div>`:"";
+  for(const c of CAMPUS){const ps=list.filter(p=>p.campus===c.id);if(!ps.length)continue;
+    h+=`<div class="grp">${c.name}</div>`+ps.map(p=>{const n=(photos[p.key]||[]).length;return `<button class="item" data-k="${p.key}"><i class="dot" style="background:${COL[p.type]}"></i><span class="nm">${esc(p.name)}<small>${TYPE[p.type]}</small></span><span class="badge${n?" ok":""}">${n?n+" ภาพ":"ยังไม่มีภาพ"}</span></button>`}).join("")}
+  if(!list.length)h+=`<div class="empty">ไม่พบสถานที่ที่ตรงกับคำค้น</div>`;
+  h+=`<p class="note">ตำแหน่งหมุดเป็นตำแหน่งโดยประมาณบนแผนที่วาดเชิงสัญลักษณ์ ไม่ใช่ผังจริงตามมาตราส่วน${rootUrl?` · <a href="${rootUrl}" target="_blank" rel="noopener">เปิดโฟลเดอร์หลักใน Drive</a>`:""}</p>`;
+  $("#pbody").innerHTML=h;
+}
+$("#pbody").addEventListener("click",e=>{
+  const it=e.target.closest(".item");if(it)return select(it.dataset.k);
+  if(e.target.closest(".back")){sel=null;drawPanel();drawMap();return}
+  const t=e.target.closest("[data-f]");if(t&&t.closest(".gal"))return openLB(t.dataset.f);
+  if(e.target.closest("#pick"))$("#file").click();
+  if(e.target.closest("#more")){const p=places.find(x=>x.key===sel);p.lim=(p.lim||12)+12;drawDetail()}
+});
+$("#pbody").addEventListener("change",e=>{if(e.target.id==="file"&&e.target.files.length)upload([...e.target.files])});
+["dragover","dragenter"].forEach(t=>$("#pbody").addEventListener(t,e=>{const d=e.target.closest(".drop");if(d){e.preventDefault();d.classList.add("over")}}));
+$("#pbody").addEventListener("dragleave",e=>{const d=e.target.closest(".drop");if(d)d.classList.remove("over")});
+$("#pbody").addEventListener("drop",e=>{const d=e.target.closest(".drop");if(!d)return;e.preventDefault();d.classList.remove("over");const f=[...e.dataTransfer.files].filter(f=>f.type.startsWith("image/")||/\.(heic|heif)$/i.test(f.name));if(f.length)upload(f)});
+
+function select(k){const p=places.find(x=>x.key===k);if(!p)return;sel=k;if(p.campus!==campus){campus=p.campus;vb={x:0,y:0,w:1000,h:700};drawTabs()}drawMap();drawPanel();if(innerWidth<=860)$("aside").scrollIntoView({behavior:"smooth"})}
+let upMsg="";
+function drawDetail(){
+  const p=places.find(x=>x.key===sel),fs=photos[p.key]||[],f=folders[p.key],lim=p.lim||12;
+  let h=`<div class="det"><button class="back">← รายการทั้งหมด</button><h2>${esc(p.name)}</h2>
+<div class="meta">${TYPE[p.type]} · ${CAMPUS.find(c=>c.id===p.campus).name} · ${fs.length} ภาพ${f?` · <a href="${f.url}" target="_blank" rel="noopener">เปิดโฟลเดอร์ใน Drive</a>`:""}</div>`;
+  if(!API)h+=`<div class="msg err">ยังไม่ได้ตั้งค่า Google Apps Script — ใส่ URL ของ Web App ใน CONFIG.API_URL (ดูวิธีใน README.md)</div>`;
+  else h+=`<div class="drop"><strong>เพิ่มภาพของ${esc(p.short)}</strong><p>ลากไฟล์ภาพมาวาง หรือกดปุ่มเลือกได้ทีละหลายภาพ ระบบย่อภาพเหลือด้านยาว 2000px ก่อนอัปโหลด</p>
+<button class="pri" id="pick" ${busy||!rootId?"disabled":""}>${busy?"กำลังอัปโหลด…":"เลือกภาพ"}</button><input type="file" id="file" accept="image/*" multiple hidden></div>`;
+  if(upMsg)h+=`<div class="msg${upMsg.startsWith("!")?" err":""}">${upMsg.replace(/^!/,"")}</div>`;
+  if(driveErr)h+=`<div class="msg err">${driveErr}</div>`;
+  if(fs.length){h+=`<div class="gal">`+fs.slice(0,lim).map(x=>`<button data-f="${x.id}" aria-label="ดูภาพ ${esc(x.title)}"><img src="${thumb(x.id,600)}" alt="" loading="lazy" onerror="this.outerHTML='<span class=ph>แสดงตัวอย่างไม่ได้</span>'"></button>`).join("")+`</div>`;
+    if(fs.length>lim)h+=`<p style="text-align:center"><button id="more">แสดงเพิ่มอีก ${Math.min(12,fs.length-lim)} ภาพ</button></p>`}
+  else if(API&&rootId)h+=`<div class="empty">ยังไม่มีภาพของสถานที่นี้ — ภาพแรกจะสร้างโฟลเดอร์ “${esc(p.name)}” ใน Drive ให้อัตโนมัติ</div>`;
+  $("#pbody").innerHTML=h+`</div>`;
+}
+
+/* ---------- Google Drive ผ่าน Google Apps Script ---------- */
+const CONFIG={API_URL:"PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE"};
+const API=/^https:\/\/script\.google\.com\//.test(CONFIG.API_URL)?CONFIG.API_URL:"";
+let ukey="";try{ukey=localStorage.getItem("cmuUploadKey")||""}catch(e){}
+const thumb=(id,w)=>`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w}`;
+function why(e){
+  if(e&&e.error==="bad_key")return"รหัสอัปโหลดไม่ถูกต้อง — ลองอีกครั้งแล้วใส่รหัสใหม่";
+  if(e instanceof TypeError)return"ติดต่อ Apps Script ไม่ได้ — ตรวจว่า deploy เป็น Web app และตั้ง Who has access เป็น Anyone";
+  return"เกิดข้อผิดพลาด: "+esc((e&&(e.error||e.message))||"ไม่ทราบสาเหตุ")}
+async function apiGet(){const r=await fetch(API+"?action=list");const j=await r.json();if(!j.ok)throw j;return j}
+async function apiPost(body){
+  const r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({...body,uploadKey:ukey})});
+  const j=await r.json();
+  if(!j.ok){if(j.error==="bad_key"){ukey="";try{localStorage.removeItem("cmuUploadKey")}catch(_){}}throw j}
+  return j}
+function askKey(){return new Promise(res=>{const d=$("#kdlg");d.classList.add("on");$("#kName").value="";$("#kName").focus();
+  const done=v=>{d.classList.remove("on");$("#kForm").onsubmit=null;$("#kCancel").onclick=null;res(v)};
+  $("#kCancel").onclick=()=>done(false);
+  $("#kForm").onsubmit=e=>{e.preventDefault();ukey=$("#kName").value.trim();if(!ukey)return;if($("#kSave").checked)try{localStorage.setItem("cmuUploadKey",ukey)}catch(_){}done(true)}})}
+async function scan(){
+  const j=await apiGet();rootUrl=j.rootUrl;rootId="ok";folders={};places=places.filter(p=>p.type!=="cus");
+  for(const f of j.folders||[]){const c=/^c:(main|suandok|maehia):(-?\d+):(-?\d+)$/.exec(f.key);
+    if(c&&!places.some(p=>p.key===f.key))places.push({key:f.key,name:f.name||"จุดของฉัน",short:(f.name||"จุดของฉัน").slice(0,14),type:"cus",campus:c[1],x:+c[2],y:+c[3]});
+    if(places.some(p=>p.key===f.key))folders[f.key]={id:f.id,url:f.url}}
+  photos={};for(const x of j.photos||[])if(folders[x.key])(photos[x.key]=photos[x.key]||[]).push({id:x.id,title:x.name,viewUrl:x.url,createdTime:x.created});
+  for(const k in photos)photos[k].sort((a,b)=>(b.createdTime||"").localeCompare(a.createdTime||""))}
+function stats(){const n=places.length,d=places.filter(p=>(photos[p.key]||[]).length).length,t=Object.values(photos).reduce((a,b)=>a+b.length,0);
+  $("#pAll").textContent=n;$("#pDone").textContent=d;$("#pPics").textContent=t;$("#pBar").style.width=(n?d/n*100:0)+"%"}
+function refresh(){stats();drawTabs();drawMap();drawPanel()}
+async function connect(){
+  if(!API){$("#dStatus").textContent="ยังไม่ได้ตั้งค่า Google Apps Script";driveErr="ยังไม่ได้ใส่ URL ของ Google Apps Script ใน CONFIG.API_URL — ดูวิธีตั้งค่าใน README.md";refresh();return}
+  try{$("#dStatus").textContent="กำลังอ่านโฟลเดอร์ใน Google Drive…";await scan();driveErr="";$("#dStatus").innerHTML=`เชื่อม Google Drive แล้ว · <a style="color:inherit" href="${esc(rootUrl)}" target="_blank" rel="noopener">เปิดโฟลเดอร์</a>`}
+  catch(e){driveErr=why(e);$("#dStatus").innerHTML=`Drive: ใช้งานไม่ได้ <button id="retry" style="min-height:32px;margin-left:6px">ลองอีกครั้ง</button>`;$("#retry").onclick=()=>{driveErr="";connect()}}
+  refresh()}
+function shrink(file,max,q){return new Promise((res,rej)=>{const u=URL.createObjectURL(file),im=new Image();
+  im.onload=()=>{const k=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement("canvas");c.width=Math.round(im.naturalWidth*k);c.height=Math.round(im.naturalHeight*k);
+    c.getContext("2d").drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?res(b):rej(),"image/jpeg",q)};
+  im.onerror=()=>{URL.revokeObjectURL(u);rej()};im.src=u})}
+const b64=blob=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(",")[1]);fr.readAsDataURL(blob)});
+const stamp=()=>{const d=new Date(),z=n=>String(n).padStart(2,"0");return`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`};
+async function upload(files){
+  if(busy||!API||!rootId)return;if(!ukey&&!(await askKey()))return;
+  const p=places.find(x=>x.key===sel);busy=true;let ok=0,fail=[];upMsg="";drawDetail();
+  for(let i=0;i<files.length;i++){const f=files[i];upMsg=`กำลังอัปโหลด ${i+1} / ${files.length}…`;drawDetail();
+    try{let blob,type="image/jpeg",ext="jpg";
+      try{blob=await shrink(f,2000,.85)}catch(_){blob=f;type=f.type||"image/heic";ext=(f.name.split(".").pop()||"jpg").toLowerCase()}
+      const name=`${p.key.replace(/:/g,"-")}_${stamp()}_${i+1}.${ext}`;
+      const r=await apiPost({action:"upload",key:p.key,placeName:p.name,name,mime:type,data:await b64(blob)});
+      if(r.folder)folders[p.key]={id:r.folder.id,url:r.folder.url};
+      (photos[p.key]=photos[p.key]||[]).unshift({id:r.file.id,title:r.file.name,viewUrl:r.file.url,createdTime:r.file.created});ok++;stats();drawMap()}
+    catch(e){fail.push(f.name+" — "+why(e));if(e&&e.error==="bad_key")break}}
+  upMsg=(fail.length?"!":"")+`อัปโหลดสำเร็จ ${ok} ภาพ`+(fail.length?` · ไม่สำเร็จ ${fail.length} ภาพ: ${fail.map(esc).join(", ")} — ถ้าเป็นปัญหาการเชื่อมต่อ ให้ตรวจใน Drive ก่อนลองใหม่ เพราะภาพอาจถูกบันทึกไปแล้ว`:"");
+  busy=false;stats();drawMap();if(sel===p.key)drawDetail()}
+function openLB(id){const f=(photos[sel]||[]).find(x=>x.id===id);if(!f)return;
+  $("#lbImg").hidden=false;$("#lbImg").src=thumb(id,1600);$("#lbCap").textContent=f.title;$("#lbLink").href=f.viewUrl||`https://drive.google.com/file/d/${id}/view`;$("#lb").classList.add("on");$("#lbClose").focus()}
+$("#lbClose").onclick=()=>$("#lb").classList.remove("on");$("#lb").onclick=e=>{if(e.target.id==="lb")$("#lb").classList.remove("on")};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){$("#lb").classList.remove("on");$("#dlg").classList.remove("on")}});
+$("#dlgCancel").onclick=()=>$("#dlg").classList.remove("on");
+$("#dlgForm").addEventListener("submit",async e=>{e.preventDefault();const name=$("#dlgName").value.trim().replace(/[\[\]]/g,"");if(!name||!addPt)return;
+  const key=`c:${campus}:${addPt.x}:${addPt.y}`,p={key,name,short:name.slice(0,14),type:"cus",campus,x:addPt.x,y:addPt.y};
+  $("#dlg").classList.remove("on");adding=false;fig.classList.remove("adding");
+  if(!ukey&&!(await askKey())){refresh();return}
+  try{const r=await apiPost({action:"addPlace",key,name});folders[key]={id:r.folder.id,url:r.folder.url};places.push(p);sel=key;upMsg=""}catch(err){driveErr=why(err)}refresh()});
+
+drawChips();refresh();connect();
+}
+</script>
+</body>
